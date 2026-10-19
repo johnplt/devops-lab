@@ -52,7 +52,6 @@ Modifier / ajuster les points clés suivants dans le fichier :
     
 ```yaml
 AIRFLOW__CORE__SQL_ALCHEMY_CONN: postgresql+psycopg2://<AIRFLOW_POSTGRES_USER> :<AIRFLOWDB_PASSWORD>@<POSTGRES_CONTENEUR_NAME>:5432/<AIRFLOW_POSTGRES_DATABASE>
-AIRFLOW__CELERY__RESULT_BACKEND: db+postgresql+psycopg2://<AIRFLOW_POSTGRES_USER> :<AIRFLOWDB_PASSWORD>@<POSTGRES_CONTENEUR_NAME>:5432/<AIRFLOW_POSTGRES_DATABASE>
 ```
 
 3. Le service triggerer : S'assurer qu'il est bien présent (obligatoire en Airflow 3).

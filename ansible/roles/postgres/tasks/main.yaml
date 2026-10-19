@@ -1,0 +1,35 @@
+---
+- name: Créer le répertoire d'installation de PostgreSQL sur la VM
+  ansible.builtin.file:
+    path: "{{ postgres_home }}"
+    state: directory
+    mode: '0755'
+
+- name: S'assurer que le dossier init-scripts existe sur la VM
+  ansible.builtin.file:
+    path: "{{ postgres_home }}/init-scripts"
+    state: directory
+    mode: '0755'
+
+- name: Générer le script d'initialisation des bases SQL
+  ansible.builtin.template:
+    src: init.sql.j2
+    dest: "{{ postgres_home }}/init-scripts/01_init_airflow.sql"
+    mode: '0644'
+  register: init_script_updated
+
+- name: Déployer le fichier docker-compose.yaml pour PostgreSQL
+  ansible.builtin.template:
+    src: docker-compose.yaml.j2
+    dest: "{{ postgres_home }}/docker-compose.yaml"
+    mode: '0644'
+  register: compose_updated
+
+- name: Démarrer ou redémarrer le conteneur PostgreSQL proprement
+  ansible.builtin.shell: |
+    {% if init_script_updated.changed or compose_updated.changed %}
+    docker compose down -v
+    {% endif %}
+    docker compose up -d --remove-orphans
+  args:
+    chdir: "{{ postgres_home }}"

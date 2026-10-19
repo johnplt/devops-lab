@@ -1,0 +1,3 @@
+/ansible/vars.yaml
+.venv/
+.python-version

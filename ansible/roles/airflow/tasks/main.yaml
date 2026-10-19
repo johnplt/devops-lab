@@ -1,0 +1,24 @@
+---
+- name: Créer le répertoire d'installation d'Airflow sur la VM
+  file:
+    path: "{{ airflow_home }}"
+    state: directory
+    mode: '0755'
+
+- name: Déployer le fichier docker-compose.yaml depuis le template
+  template:
+    src: docker-compose.yaml.j2
+    dest: "{{ airflow_home }}/docker-compose.yaml"
+    mode: '0644'
+
+- name: Lancer l'initialisation de la base de données Airflow
+  shell: |
+    docker compose up airflow-init
+  args:
+    chdir: "{{ airflow_home }}"
+
+- name: Démarrer les services Airflow en arrière-plan
+  shell: |
+    docker compose up -d
+  args:
+    chdir: "{{ airflow_home }}"

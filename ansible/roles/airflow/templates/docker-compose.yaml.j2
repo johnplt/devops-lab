@@ -1,0 +1,61 @@
+name: devops-lab-airflow
+
+networks:
+  app-network:
+    external: true
+
+services:
+  airflow-init:
+    image: apache/airflow:{{ airflow_version }}
+    container_name: airflow_init
+    entrypoint: /bin/bash
+    environment:
+      &airflow-common-env
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://{{ airflow_db_user }}:{{ airflow_db_password }}@{{ conteneur_name }}:5432/{{ airflow_db_name }}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+      AIRFLOW_UID: "50000"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: "{{ airflow_admin_user }}"
+      _AIRFLOW_WWW_USER_PASSWORD: "{{ airflow_admin_password }}"
+    command: -c "airflow db migrate && airflow users create --username {{ airflow_admin_user }} --firstname Admin --lastname User --role Admin --email admin@example.com --password {{ airflow_admin_password }} || true"
+    networks:
+      - app-network
+
+  airflow-api-server:
+    image: apache/airflow:{{ airflow_version }}
+    container_name: airflow_api_server
+    restart: always
+    depends_on:
+      - airflow-init
+    environment:
+      <<: *airflow-common-env
+    ports:
+      - "8080:8080"
+    command: api-server
+    networks:
+      - app-network
+
+  airflow-scheduler:
+    image: apache/airflow:{{ airflow_version }}
+    container_name: airflow_scheduler
+    restart: always
+    depends_on:
+      - airflow-init
+    environment:
+      <<: *airflow-common-env
+    command: scheduler
+    networks:
+      - app-network
+
+  airflow-triggerer:
+    image: apache/airflow:{{ airflow_version }}
+    container_name: airflow_triggerer
+    restart: always
+    depends_on:
+      - airflow-init
+    environment:
+      <<: *airflow-common-env
+    command: triggerer
+    networks:
+      - app-network

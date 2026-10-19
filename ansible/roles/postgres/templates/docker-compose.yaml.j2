@@ -1,0 +1,26 @@
+version: '3.8'
+
+name: devops-lab-postgres
+
+networks:
+  app-network:
+    external: true
+
+volumes:
+  postgres_data:
+
+services:
+  shared_postgres:
+    image: postgres:15-alpine
+    container_name: {{ conteneur_name }}
+    restart: always
+    environment:
+      POSTGRES_USER: postgres       # Super-administrateur
+      POSTGRES_PASSWORD: {{ admin_db_password }} # Mot de passe admin global
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - {{ postgres_home }}/init-scripts:/docker-entrypoint-initdb.d # <--- C'est ici !
+    networks:
+      - app-network
+    ports:
+      - "5432:5432"

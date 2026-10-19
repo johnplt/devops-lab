@@ -1,0 +1,8 @@
+all:
+  hosts:
+    hetzner_vm:
+      ansible_host: "{{ ip_address }}"
+      ansible_user: root
+      # Si clé SSH spécifique :
+      ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+      ansible_python_interpreter: "/usr/bin/python3"

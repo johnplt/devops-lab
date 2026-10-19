@@ -1,0 +1,10 @@
+---
+conteneur_name:
+db_user:
+db_password:
+airflow_db_name:
+airflow_db_user:
+airflow_db_password:
+airflow_admin_user:
+airflow_admin_password:
+ip_address:

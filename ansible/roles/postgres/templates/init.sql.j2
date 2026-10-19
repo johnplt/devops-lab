@@ -1,0 +1,9 @@
+-- Création de la base et de l'utilisateur Airflow
+CREATE DATABASE {{ airflow_db_name | default('airflow_db') }};
+CREATE USER {{ airflow_db_user | default('airflow') }} WITH PASSWORD '{{ airflow_db_password }}';
+GRANT ALL PRIVILEGES ON DATABASE {{ airflow_db_name | default('airflow_db') }} TO {{ airflow_db_user | default('airflow') }};
+
+-- IMPORTANT : Donner les droits sur le schéma public de la base airflow_db
+\c {{ airflow_db_name | default('airflow_db') }}
+GRANT ALL ON SCHEMA public TO {{ airflow_db_user | default('airflow') }};
+ALTER SCHEMA public OWNER TO {{ airflow_db_user | default('airflow') }};
