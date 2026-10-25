@@ -1,9 +1,11 @@
 ---
 - hosts: hetzner_vm
-  become: true
   vars_files:
     - vars.yaml   # Ansible va piocher les vraies valeurs ici en local
   roles:
-    - docker
-    - postgres
-    - airflow
+    - role: docker
+      become: true
+    - role: postgres
+      become: false
+    - role: airflow
+      become: false

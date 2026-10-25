@@ -14,7 +14,7 @@
     state: directory
     mode: '0755'
 
-- name: Ajouter la clé GPG officielle de Docker
+- name: Télécharger la clé GPG officielle de Docker au format asc
   get_url:
     url: https://download.docker.com/linux/ubuntu/gpg
     dest: /etc/apt/keyrings/docker.asc
@@ -22,7 +22,7 @@
 
 - name: Ajouter le dépôt officiel Docker APT
   apt_repository:
-    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable"
     state: present
 
 - name: Installer Docker Engine et Docker Compose
