@@ -1,0 +1,6 @@
+---
+- name: Redémarrer Cinemind
+  community.docker.docker_container:
+    name: cinemind-app
+    state: started
+    restart: true

@@ -9,3 +9,5 @@
       become: false
     - role: airflow
       become: false
+    - role: apps/cinemind
+      become: false

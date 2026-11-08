@@ -1,0 +1,138 @@
+- name: S'assurer que la base de données existe dans shared_postgres
+  ansible.builtin.command: >
+    docker exec {{ conteneur_name }} psql -U postgres -c "CREATE DATABASE {{ cinemind_db_name }};"
+  environment:
+    PGPASSWORD: "{{ admin_db_password }}"
+  register: db_creation
+  failed_when: db_creation.rc != 0 and 'already exists' not in db_creation.stderr
+  changed_when: db_creation.rc == 0
+
+- name: Activer l'extension pgvector dans la base
+  ansible.builtin.command: >
+    docker exec {{ conteneur_name }} psql -U postgres -d {{ cinemind_db_name }} -c "CREATE EXTENSION IF NOT EXISTS vector;"
+  environment:
+    PGPASSWORD: "{{ admin_db_password }}"
+  changed_when: true
+
+- name: Créer l'utilisateur applicatif s'il n'existe pas
+  ansible.builtin.command: >
+    docker exec {{ conteneur_name }} psql -U postgres -d {{ cinemind_db_name }} -c 
+    "CREATE ROLE {{ cinemind_db_user }} LOGIN PASSWORD '{{ cinemind_db_password }}';"
+  environment:
+    PGPASSWORD: "{{ admin_db_password }}"
+  register: create_user_result
+  failed_when: 
+    - create_user_result.rc != 0
+    - "'already exists' not in create_user_result.stderr"
+  changed_when: create_user_result.rc == 0
+
+- name: Attribuer les privilèges à l'utilisateur sur la base et le schéma public
+  ansible.builtin.command: >
+    docker exec {{ conteneur_name }} psql -U postgres -d {{ cinemind_db_name }} -c 
+    "GRANT ALL PRIVILEGES ON DATABASE {{ cinemind_db_name }} TO {{ cinemind_db_user }};
+     GRANT ALL ON SCHEMA public TO {{ cinemind_db_user }};
+     ALTER SCHEMA public OWNER TO {{ cinemind_db_user }};"
+  environment:
+    PGPASSWORD: "{{ admin_db_password }}"
+  changed_when: true
+
+- name: S'assurer que le répertoire parent /opt/apps existe avec les bons droits
+  ansible.builtin.file:
+    path: /opt/apps
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+  become: true
+
+- name: Créer le répertoire de l'application Cinemind sur la VM
+  ansible.builtin.file:
+    path: /opt/apps/cinemind
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Cloner ou mettre à jour le dépôt public Cinemind depuis GitHub
+  ansible.builtin.git:
+    repo: 'https://github.com/johnplt/cinemind.git'
+    dest: /opt/apps/cinemind
+    version: main
+    force: yes
+  notify: Redémarrer Cinemind
+
+- name: Déployer le fichier de variables d'environnement (.env)
+  ansible.builtin.template:
+    src: env.j2
+    dest: /opt/apps/cinemind/.env
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0600'
+  notify: Redémarrer Cinemind
+
+- name: Supprimer l'ancienne image Docker pour éviter les conflits de cache
+  community.docker.docker_image:
+    name: cinemind-app
+    state: absent
+    force_absent: true
+
+- name: Builder l'image Docker de l'application Cinemind à partir de zéro
+  community.docker.docker_image:
+    name: cinemind-app
+    source: build
+    build:
+      path: /opt/apps/cinemind
+      nocache: yes
+    state: present
+
+- name: Lancer le conteneur Streamlit en le connectant au réseau de shared_postgres
+  community.docker.docker_container:
+    name: cinemind-app
+    image: cinemind-app
+    state: started
+    recreate: true
+    restart_policy: always
+    ports:
+      - "8501:8501"
+    env_file: /opt/apps/cinemind/.env
+    networks:
+      - name: app-network
+
+- name: Vérifier le nombre de lignes dans la table movies
+  ansible.builtin.command: >
+    docker exec {{ conteneur_name }} psql -U postgres -d {{ cinemind_db_name }} -t -c "
+    SELECT COUNT(*) FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = 'movies';"
+  environment:
+    PGPASSWORD: "{{ admin_db_password }}"
+  register: table_exists
+  changed_when: false
+
+- name: Vérifier si la table est vide
+  ansible.builtin.command: >
+    docker exec {{ conteneur_name }} psql -U postgres -d {{ cinemind_db_name }} -t -c "SELECT COUNT(*) FROM movies;"
+  environment:
+    PGPASSWORD: "{{ admin_db_password }}"
+  register: movies_count
+  when: table_exists.stdout | trim | int > 0
+  changed_when: false
+
+- name: Lancer l'extraction initiale (Backfill TMDB) dans le conteneur
+  ansible.builtin.command: >
+    docker exec cinemind-app .venv/bin/python scripts/extract_tmdb.py backfill
+  when: table_exists.stdout | trim | int == 0 or (movies_count.stdout is defined and movies_count.stdout | trim | int == 0)
+  register: extract_backfill
+  changed_when: true
+  failed_when: 
+    - extract_backfill.rc != 0
+    - "'Erreur' in extract_backfill.stdout or 'Erreur' in extract_backfill.stderr"
+
+- name: Lancer l'ingestion et l'embedding initial (Backfill Pipeline) dans le conteneur
+  ansible.builtin.command: >
+    docker exec cinemind-app .venv/bin/python scripts/ingest_and_embed.py backfill
+  when: table_exists.stdout | trim | int == 0 or (movies_count.stdout is defined and movies_count.stdout | trim | int == 0)
+  register: ingest_backfill
+  changed_when: true
+  failed_when: 
+    - ingest_backfill.rc != 0
+    - "'Erreur' in ingest_backfill.stdout or 'Erreur' in ingest_backfill.stderr"

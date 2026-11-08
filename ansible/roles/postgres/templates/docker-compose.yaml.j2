@@ -11,7 +11,7 @@ volumes:
 
 services:
   shared_postgres:
-    image: postgres:15-alpine
+    image: pgvector/pgvector:pg16
     container_name: {{ conteneur_name }}
     restart: always
     environment:
@@ -22,5 +22,3 @@ services:
       - {{ postgres_home }}/init-scripts:/docker-entrypoint-initdb.d # <--- C'est ici !
     networks:
       - app-network
-    ports:
-      - "5432:5432"
