@@ -9,5 +9,7 @@
       become: false
     - role: airflow
       become: false
+      tags: airflow
     - role: apps/cinemind
       become: false
+      tags: cinemind
